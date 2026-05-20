@@ -589,10 +589,15 @@
         const weaponGroup = new THREE.Group();
         weaponGroup.position.set(1.5, -1.5, -2.5);
         
-        const weaponTexture = new THREE.TextureLoader().load('nueva_arma.png');
+        const weaponTexture = new THREE.TextureLoader().load('arma_ai.png');
         weaponTexture.magFilter = THREE.NearestFilter;
         weaponTexture.minFilter = THREE.NearestFilter;
-        const weaponMat = new THREE.SpriteMaterial({ map: weaponTexture, color: 0xffffff });
+        const weaponMat = new THREE.SpriteMaterial({ 
+            map: weaponTexture, 
+            color: 0xffffff,
+            blending: THREE.AdditiveBlending,
+            transparent: true 
+        });
         const gunSprite = new THREE.Sprite(weaponMat);
         gunSprite.scale.set(4.5, 4.5, 1);
         gunSprite.position.set(0, 0, 0);
