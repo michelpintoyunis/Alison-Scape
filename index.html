@@ -35,12 +35,32 @@
             transition: opacity 0.2s;
         }
 
-        .character-selector {
+        .character-slider {
             display: flex;
             gap: 20px;
-            margin-bottom: 30px;
-            flex-wrap: wrap;
-            justify-content: center;
+            margin: 20px 0;
+            padding: 10px 0;
+            overflow-x: auto;
+            max-width: 500px;
+            scroll-snap-type: x mandatory;
+        }
+
+        .character-slider::-webkit-scrollbar {
+            height: 12px;
+        }
+
+        .character-slider::-webkit-scrollbar-track {
+            background: rgba(20, 0, 0, 0.5);
+        }
+
+        .character-slider::-webkit-scrollbar-thumb {
+            background: #8b0000;
+            border-radius: 6px;
+        }
+
+        .character-slider .character-card {
+            flex: 0 0 auto;
+            scroll-snap-align: center;
         }
 
         .character-card {
@@ -273,7 +293,13 @@
     <div id="start-screen" class="screen">
         <h1>ALISON SCAPE</h1>
         <p><strong>WASD</strong> to move. <strong>MOUSE</strong> to look. <strong>SHIFT</strong> to sprint. <strong>CLICK</strong> to shoot.</p>
-        <div class="character-selector">
+        <button id="start-btn" class="btn">ENTER THE NIGHTMARE</button>
+        <button id="chars-btn" class="btn" style="margin-top: 15px; font-size: 1.5rem; padding: 10px 30px;">PERSONAJES</button>
+    </div>
+
+    <div id="characters-screen" class="screen" style="display: none;">
+        <h2 style="font-family: 'Creepster', cursive; font-size: 4rem; color: #ff3333; margin-bottom: 0;">SELECCIONA TU MONSTRUO</h2>
+        <div class="character-slider">
             <div class="character-card active">
                 <img src="alison.png" alt="Alison">
                 <p>Alison</p>
@@ -294,7 +320,7 @@
                 <div class="question-mark">?</div><p>Michel</p>
             </div>
         </div>
-        <button id="start-btn" class="btn">ENTER THE NIGHTMARE</button>
+        <button id="back-btn" class="btn">VOLVER</button>
     </div>
 
     <div id="game-over-screen" class="screen" style="display: none;">
@@ -561,7 +587,7 @@
         // WEAPON SYSTEM
         // ==========================================
         const weaponGroup = new THREE.Group();
-        weaponGroup.position.set(1.0, -1.2, -2.5);
+        weaponGroup.position.set(1.5, -1.5, -2.5);
         
         const weaponTexture = new THREE.TextureLoader().load('arma.webp');
         weaponTexture.magFilter = THREE.NearestFilter;
@@ -1236,6 +1262,16 @@
         document.getElementById('menu-btn-lose').addEventListener('click', () => location.reload());
         document.getElementById('resume-btn').addEventListener('click', () => document.body.requestPointerLock());
         document.getElementById('menu-btn-pause').addEventListener('click', () => location.reload());
+
+        document.getElementById('chars-btn').addEventListener('click', () => {
+            document.getElementById('start-screen').style.display = 'none';
+            document.getElementById('characters-screen').style.display = 'flex';
+        });
+
+        document.getElementById('back-btn').addEventListener('click', () => {
+            document.getElementById('characters-screen').style.display = 'none';
+            document.getElementById('start-screen').style.display = 'flex';
+        });
 
         window.addEventListener('resize', () => {
             camera.aspect = window.innerWidth / window.innerHeight;
