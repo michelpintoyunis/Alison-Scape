@@ -25,14 +25,6 @@
         }
 
         /* Post-processing effects */
-        #vignette {
-            position: absolute;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: radial-gradient(circle, transparent 40%, rgba(0, 0, 0, 0.9) 100%);
-            pointer-events: none;
-            z-index: 10;
-        }
-
         #blood-overlay {
             position: absolute;
             top: 0; left: 0; width: 100%; height: 100%;
@@ -43,15 +35,58 @@
             transition: opacity 0.2s;
         }
 
-        /* Flash on shoot */
-        #muzzle-flash {
-            position: absolute;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background-color: rgba(255, 255, 200, 0.5);
-            opacity: 0;
-            pointer-events: none;
-            z-index: 12;
-            transition: opacity 0.05s;
+        .character-selector {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .character-card {
+            width: 120px;
+            height: 150px;
+            background: rgba(30, 0, 0, 0.8);
+            border: 2px solid #500;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .character-card.active {
+            border-color: #ff0000;
+            box-shadow: 0 0 15px rgba(255,0,0,0.5);
+            transform: scale(1.05);
+        }
+
+        .character-card.locked {
+            opacity: 0.5;
+            cursor: not-allowed;
+            filter: grayscale(100%);
+        }
+
+        .character-card img {
+            width: 80px;
+            height: 80px;
+            object-fit: cover;
+            margin-bottom: 10px;
+        }
+
+        .question-mark {
+            font-size: 4rem;
+            color: #888;
+            margin-bottom: 10px;
+        }
+
+        .character-card p {
+            font-size: 1.2rem !important;
+            margin: 0 !important;
+            color: #ccc !important;
+            font-family: 'Courier New', Courier, monospace !important;
+            text-shadow: none !important;
         }
 
         /* HUD */
@@ -218,9 +253,7 @@
 <body>
 
     <div id="game-container"></div>
-    <div id="vignette"></div>
     <div id="blood-overlay"></div>
-    <div id="muzzle-flash"></div>
 
     <div id="hud">
         <div id="crosshair"></div>
@@ -239,9 +272,28 @@
 
     <div id="start-screen" class="screen">
         <h1>ALISON SCAPE</h1>
-        <p>She is hunting you. Now you can hunt her back.</p>
         <p><strong>WASD</strong> to move. <strong>MOUSE</strong> to look. <strong>SHIFT</strong> to sprint. <strong>CLICK</strong> to shoot.</p>
-        <p style="color:red;">Find ammo boxes to survive.</p>
+        <div class="character-selector">
+            <div class="character-card active">
+                <img src="alison.png" alt="Alison">
+                <p>Alison</p>
+            </div>
+            <div class="character-card locked">
+                <div class="question-mark">?</div><p>Miguel</p>
+            </div>
+            <div class="character-card locked">
+                <div class="question-mark">?</div><p>Enmanuel</p>
+            </div>
+            <div class="character-card locked">
+                <div class="question-mark">?</div><p>Samuel</p>
+            </div>
+            <div class="character-card locked">
+                <div class="question-mark">?</div><p>Yeral</p>
+            </div>
+            <div class="character-card locked">
+                <div class="question-mark">?</div><p>Michel</p>
+            </div>
+        </div>
         <button id="start-btn" class="btn">ENTER THE NIGHTMARE</button>
     </div>
 
@@ -509,20 +561,27 @@
         // WEAPON SYSTEM
         // ==========================================
         const weaponGroup = new THREE.Group();
-        weaponGroup.position.set(1.5, -1.5, -3);
+        weaponGroup.position.set(1.0, -1.2, -2.5);
         
-        const barrelGeo = new THREE.CylinderGeometry(0.2, 0.2, 4, 8);
-        barrelGeo.rotateX(Math.PI / 2);
-        const barrelMat = new THREE.MeshPhongMaterial({ color: 0x222222, flatShading: true });
-        const barrel = new THREE.Mesh(barrelGeo, barrelMat);
+        const weaponTexture = new THREE.TextureLoader().load('arma.webp');
+        weaponTexture.magFilter = THREE.NearestFilter;
+        weaponTexture.minFilter = THREE.NearestFilter;
+        const weaponMat = new THREE.SpriteMaterial({ map: weaponTexture, color: 0xffffff });
+        const gunSprite = new THREE.Sprite(weaponMat);
+        gunSprite.scale.set(4, 4, 1);
+        gunSprite.position.set(0, 0, 0);
+        weaponGroup.add(gunSprite);
         
-        const bodyGeo = new THREE.BoxGeometry(0.8, 1, 2);
-        const bodyMat = new THREE.MeshPhongMaterial({ color: 0x111111, flatShading: true });
-        const gunBody = new THREE.Mesh(bodyGeo, bodyMat);
-        gunBody.position.set(0, -0.5, 1);
+        const flashMat = new THREE.SpriteMaterial({ color: 0xffffaa, transparent: true, opacity: 0 });
+        const muzzleFlashSprite = new THREE.Sprite(flashMat);
+        muzzleFlashSprite.scale.set(1.5, 1.5, 1);
+        muzzleFlashSprite.position.set(-0.6, 0.8, 0); 
+        weaponGroup.add(muzzleFlashSprite);
 
-        weaponGroup.add(barrel);
-        weaponGroup.add(gunBody);
+        const muzzleLight = new THREE.PointLight(0xffaa00, 0, 20);
+        muzzleLight.position.set(-0.6, 0.8, 0);
+        weaponGroup.add(muzzleLight);
+
         pitchObject.add(weaponGroup);
 
         let recoilTime = 0;
@@ -752,11 +811,12 @@
             
             playShootSound();
 
-            const flash = document.getElementById('muzzle-flash');
-            flash.style.opacity = 1;
-            setTimeout(() => { flash.style.opacity = 0; }, 50);
-
-            // Muzzle flash de linterna removido
+            muzzleFlashSprite.material.opacity = 1;
+            muzzleLight.intensity = 2;
+            setTimeout(() => { 
+                muzzleFlashSprite.material.opacity = 0; 
+                muzzleLight.intensity = 0; 
+            }, 50);
 
             raycaster.setFromCamera(new THREE.Vector2(0,0), camera);
             
