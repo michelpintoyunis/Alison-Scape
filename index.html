@@ -592,10 +592,10 @@
         const weaponTexture = new THREE.TextureLoader().load('arma.webp');
         weaponTexture.magFilter = THREE.NearestFilter;
         weaponTexture.minFilter = THREE.NearestFilter;
-        const weaponMat = new THREE.SpriteMaterial({ map: weaponTexture, color: 0xffffff });
-        const gunSprite = new THREE.Sprite(weaponMat);
-        gunSprite.scale.set(4, 4, 1);
+        const weaponMat = new THREE.MeshBasicMaterial({ map: weaponTexture, color: 0xffffff, transparent: true, alphaTest: 0.1, side: THREE.DoubleSide });
+        const gunSprite = new THREE.Mesh(new THREE.PlaneGeometry(4, 4), weaponMat);
         gunSprite.position.set(0, 0, 0);
+        gunSprite.rotation.y = -0.5; // Inclina la perspectiva del arma hacia el centro
         weaponGroup.add(gunSprite);
         
         const flashMat = new THREE.SpriteMaterial({ color: 0xffffaa, transparent: true, opacity: 0 });
