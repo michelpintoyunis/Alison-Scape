@@ -587,30 +587,42 @@
         // WEAPON SYSTEM
         // ==========================================
         const weaponGroup = new THREE.Group();
-        weaponGroup.position.set(1.5, -1.5, -2.5);
+        weaponGroup.position.set(1.0, -1.5, -2.0);
+        weaponGroup.rotation.y = 0.2; 
+        weaponGroup.rotation.z = 0.1;
+        weaponGroup.rotation.x = 0.05;
+
+        // Grip (Mango del arma)
+        const gripGeo = new THREE.BoxGeometry(0.25, 1.0, 0.4);
+        const gripMat = new THREE.MeshPhongMaterial({ color: 0x111111, flatShading: true });
+        const grip = new THREE.Mesh(gripGeo, gripMat);
+        grip.position.set(0, -0.6, 0.5);
+        grip.rotation.x = Math.PI / 8;
+
+        // Slide (Cuerpo superior / Cañón)
+        const barrelGeo = new THREE.BoxGeometry(0.35, 0.4, 2.0);
+        const metalMat = new THREE.MeshPhongMaterial({ color: 0x555555, flatShading: true, shininess: 100 });
+        const gunBarrel = new THREE.Mesh(barrelGeo, metalMat);
+        gunBarrel.position.set(0, 0, -0.2);
+
+        // Sight (Mira pequeña)
+        const sightGeo = new THREE.BoxGeometry(0.08, 0.15, 0.15);
+        const sight = new THREE.Mesh(sightGeo, gripMat);
+        sight.position.set(0, 0.25, -1.0);
+
+        weaponGroup.add(grip);
+        weaponGroup.add(gunBarrel);
+        weaponGroup.add(sight);
         
-        const weaponTexture = new THREE.TextureLoader().load('arma_ai.png');
-        weaponTexture.magFilter = THREE.NearestFilter;
-        weaponTexture.minFilter = THREE.NearestFilter;
-        const weaponMat = new THREE.SpriteMaterial({ 
-            map: weaponTexture, 
-            color: 0xffffff,
-            blending: THREE.AdditiveBlending,
-            transparent: true 
-        });
-        const gunSprite = new THREE.Sprite(weaponMat);
-        gunSprite.scale.set(4.5, 4.5, 1);
-        gunSprite.position.set(0, 0, 0);
-        weaponGroup.add(gunSprite);
-        
+        // Muzzle Flash
         const flashMat = new THREE.SpriteMaterial({ color: 0xffffaa, transparent: true, opacity: 0 });
         const muzzleFlashSprite = new THREE.Sprite(flashMat);
         muzzleFlashSprite.scale.set(1.5, 1.5, 1);
-        muzzleFlashSprite.position.set(-0.6, 0.8, 0); 
+        muzzleFlashSprite.position.set(0, 0.1, -1.3); 
         weaponGroup.add(muzzleFlashSprite);
 
         const muzzleLight = new THREE.PointLight(0xffaa00, 0, 20);
-        muzzleLight.position.set(-0.6, 0.8, 0);
+        muzzleLight.position.set(0, 0.1, -1.3);
         weaponGroup.add(muzzleLight);
 
         pitchObject.add(weaponGroup);
