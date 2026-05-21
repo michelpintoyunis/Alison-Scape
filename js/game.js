@@ -1042,10 +1042,14 @@
             const menuBg = document.getElementById('menu-background');
             const loadingScreen = document.getElementById('loading-screen');
             const fadeOverlay = document.getElementById('fade-overlay');
+            const versionTag = document.getElementById('version-tag');
             
-            // Phase 1: Slow 3-second fadeout of start menu and background image
+            // Phase 1: Slow 3-second fadeout of start menu, version, and background image
             startScreen.classList.add('fade-out-3s');
             menuBg.classList.add('fade-out-3s');
+            if (versionTag) {
+                versionTag.classList.add('fade-out-3s');
+            }
             
             // Fade the black overlay to fully opaque over 3 seconds to completely hide the 3D scene in the background
             fadeOverlay.style.transition = 'opacity 3s ease-in-out';
@@ -1104,6 +1108,13 @@
             
             document.getElementById('start-screen').style.display = 'none';
             document.getElementById('menu-background').style.display = 'none';
+            
+            const versionTag = document.getElementById('version-tag');
+            if (versionTag) {
+                versionTag.style.display = 'none';
+                versionTag.classList.remove('fade-out-3s');
+            }
+            
             document.getElementById('hud').style.display = 'block';
             if (isTouchDevice) {
                 document.getElementById('touch-controls').style.display = 'block';
