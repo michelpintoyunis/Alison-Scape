@@ -1383,7 +1383,10 @@
             function deactivateEasterEgg() {
                 isEggActive = false;
 
-                // Fade-out del overlay
+                // 1. Detener el grito INMEDIATAMENTE
+                stopEggLoop();
+
+                // 2. Fade-out del overlay
                 overlay.style.transition = 'opacity 0.4s ease';
                 overlay.style.opacity = '0';
                 setTimeout(() => {
@@ -1392,13 +1395,21 @@
                     overlay.style.transition = '';
                 }, 400);
 
-                // Detener grito completamente
-                stopEggLoop();
-
-                // Restaurar música del menú si el juego no ha iniciado
+                // 3. Reiniciar el soundtrack desde el principio con fade-in gradual
                 if (gameState !== 'PLAYING' && gameState !== 'GAMEOVER') {
-                    menuMusic.volume = 0.3;
-                    menuMusic.play().catch(e => console.warn('menuMusic resume error:', e));
+                    menuMusic.pause();
+                    menuMusic.currentTime = 0;
+                    menuMusic.volume = 0;
+                    menuMusic.play().then(() => {
+                        // Subir el volumen gradualmente en 1 segundo (20 pasos de 50ms)
+                        let step = 0;
+                        const target = 0.3;
+                        const fadeIn = setInterval(() => {
+                            step++;
+                            menuMusic.volume = Math.min(target, (step / 20) * target);
+                            if (step >= 20) clearInterval(fadeIn);
+                        }, 50);
+                    }).catch(e => console.warn('menuMusic restart error:', e));
                 }
             }
 
