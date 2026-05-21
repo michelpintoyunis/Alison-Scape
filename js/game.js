@@ -1322,29 +1322,39 @@
                 }
             }
 
-            // --- ACTIVAR con 10 clicks en el título ---
-            if (titleEl) {
-                titleEl.addEventListener('click', (e) => {
-                    e.stopPropagation(); // No propagar al body listener de música
-                    if (isEggActive) return;
+            // Función compartida de conteo — funciona en AMBAS pantallas
+            function onTitleClick(e, clickedEl) {
+                e.stopPropagation();
+                if (isEggActive) return;
 
-                    titleClicks++;
-                    titleEl.classList.add('egg-charging');
+                titleClicks++;
 
+                // Efecto de carga visual en el título clickeado
+                if (clickedEl) clickedEl.classList.add('egg-charging');
+                if (titleEl)   titleEl.classList.add('egg-charging');
+
+                clearTimeout(chargeTimeout);
+                chargeTimeout = setTimeout(() => {
+                    titleClicks = 0;
+                    if (titleEl)       titleEl.classList.remove('egg-charging');
+                    if (splashTitleEl) splashTitleEl.classList.remove('egg-charging');
+                }, 3000);
+
+                if (titleClicks >= 10) {
+                    titleClicks = 0;
                     clearTimeout(chargeTimeout);
-                    chargeTimeout = setTimeout(() => {
-                        titleClicks = 0;
-                        titleEl.classList.remove('egg-charging');
-                    }, 3000);
-
-                    if (titleClicks >= 10) {
-                        titleClicks = 0;
-                        clearTimeout(chargeTimeout);
-                        titleEl.classList.remove('egg-charging');
-                        activateEasterEgg();
-                    }
-                });
+                    if (titleEl)       titleEl.classList.remove('egg-charging');
+                    if (splashTitleEl) splashTitleEl.classList.remove('egg-charging');
+                    activateEasterEgg();
+                }
             }
+
+            // --- ACTIVAR con 10 clicks en cualquiera de los dos títulos ---
+            const splashTitleEl = document.getElementById('splash-title-trigger');
+
+            if (titleEl)       titleEl.addEventListener('click',       (e) => onTitleClick(e, titleEl));
+            if (splashTitleEl) splashTitleEl.addEventListener('click', (e) => onTitleClick(e, splashTitleEl));
+
 
             function activateEasterEgg() {
                 isEggActive = true;
