@@ -1260,68 +1260,35 @@
             let closeClicks   = 0;
             let chargeTimeout = null;
             let isEggActive   = false;
+            let eggAudios     = [];   // las 10 instancias de Audio activas
 
-            // === Web Audio API para volumen extremo (muy por encima del 100%) ===
-            let eggAudioCtx   = null;
-            let eggGainNode   = null;
-            let eggBuffer     = null;   // AudioBuffer decodificado
-            let eggRawBuffer  = null;   // ArrayBuffer crudo (reutilizable)
-            let eggSources    = [];     // fuentes activas
-
-            // Pre-cargar los bytes crudos del grito (SIN crear AudioContext aún)
-            // El AudioContext se crea solo cuando el usuario hace click (gesto requerido por browsers)
-            fetch('assets/audio/grito_terror.mp3')
-                .then(r => r.arrayBuffer())
-                .then(ab => { eggRawBuffer = ab; })
-                .catch(e => console.warn('Easter egg preload failed:', e));
-
-            // 10 gritos con loop nativo (reinicio INSTANTÁNEO, sin gaps, sin setTimeout)
-            function playEggLoop() {
-                if (!eggAudioCtx || !eggBuffer || !eggGainNode) return;
-
-                const TRIM_START = 1.0;  // recortar primer segundo
-                const TRIM_END   = 1.0;  // recortar último segundo
-                const SOURCES    = 10;   // gritos simultáneos
-                const loopEnd    = Math.max(TRIM_START + 0.1, eggBuffer.duration - TRIM_END);
-
-                // Limpiar fuentes previas
-                eggSources.forEach(s => { try { s.stop(0); s.disconnect(); } catch(e) {} });
-                eggSources = [];
-
-                for (let i = 0; i < SOURCES; i++) {
-                    const src = eggAudioCtx.createBufferSource();
-                    src.buffer    = eggBuffer;
-                    src.loop      = true;        // loop nativo → reinicio INSTANTÁNEO
-                    src.loopStart = TRIM_START;  // empieza en el segundo 1
-                    src.loopEnd   = loopEnd;     // termina 1s antes del final
-                    src.connect(eggGainNode);
-                    src.start(0, TRIM_START);    // comenzar ya desde el corte
-                    eggSources.push(src);
+            // --- Audio: 10 instancias simultáneas con HTML Audio (funciona siempre) ---
+            function startScream() {
+                stopScream(); // limpiar anteriores si existieran
+                for (let i = 0; i < 10; i++) {
+                    const a = new Audio('assets/audio/grito_terror.mp3');
+                    a.loop   = true;
+                    a.volume = 1.0;
+                    a.currentTime = 1.0; // saltar el primer segundo
+                    a.play().catch(err => console.warn('Egg audio error:', err));
+                    eggAudios.push(a);
                 }
             }
 
-            // Cierra el contexto completamente → silencio INMEDIATO y total
-            function stopEggLoop() {
-                eggSources.forEach(s => { try { s.stop(0); s.disconnect(); } catch(e) {} });
-                eggSources = [];
-                if (eggAudioCtx) {
-                    eggAudioCtx.close().catch(() => {});
-                    eggAudioCtx = null;
-                    eggGainNode = null;
-                    // eggBuffer queda intacto para reutilizar en la próxima activación
-                }
+            function stopScream() {
+                eggAudios.forEach(a => { a.pause(); a.currentTime = 0; });
+                eggAudios = [];
             }
 
-            // Función compartida de conteo — funciona en AMBAS pantallas
+            // --- Función compartida de conteo (ambos títulos) ---
             function onTitleClick(e, clickedEl) {
                 e.stopPropagation();
                 if (isEggActive) return;
 
                 titleClicks++;
-
-                // Efecto de carga visual en el título clickeado
-                if (clickedEl) clickedEl.classList.add('egg-charging');
-                if (titleEl)   titleEl.classList.add('egg-charging');
+                if (clickedEl)   clickedEl.classList.add('egg-charging');
+                if (titleEl)     titleEl.classList.add('egg-charging');
+                if (splashTitleEl) splashTitleEl.classList.add('egg-charging');
 
                 clearTimeout(chargeTimeout);
                 chargeTimeout = setTimeout(() => {
@@ -1341,57 +1308,29 @@
 
             // --- ACTIVAR con 10 clicks en cualquiera de los dos títulos ---
             const splashTitleEl = document.getElementById('splash-title-trigger');
-
             if (titleEl)       titleEl.addEventListener('click',       (e) => onTitleClick(e, titleEl));
             if (splashTitleEl) splashTitleEl.addEventListener('click', (e) => onTitleClick(e, splashTitleEl));
 
-
-            // activateEasterEgg es async: crea AudioContext DENTRO del click (gesto del usuario)
-            // → el browser lo arranca en 'running', nunca en 'suspended'
-            async function activateEasterEgg() {
+            function activateEasterEgg() {
                 isEggActive = true;
                 closeClicks = 0;
 
-                // Mostrar overlay
                 overlay.style.display = 'block';
 
-                // --- Silenciar COMPLETAMENTE la música del menú ---
+                // Silenciar música del menú
                 menuMusic.volume = 0;
                 menuMusic.pause();
                 menuMusic.currentTime = 0;
 
-                // --- Crear contexto FRESCO en cada activación (dentro del gesto del usuario) ---
-                if (eggRawBuffer) {
-                    try {
-                        // Cerrar contexto anterior si existe
-                        if (eggAudioCtx) {
-                            eggAudioCtx.close().catch(() => {});
-                            eggAudioCtx = null;
-                            eggGainNode = null;
-                        }
-
-                        const AC = window.AudioContext || window.webkitAudioContext;
-                        eggAudioCtx = new AC(); // arranca 'running' porque está en un click
-
-                        // slice() para no consumir el ArrayBuffer original
-                        eggBuffer = await eggAudioCtx.decodeAudioData(eggRawBuffer.slice(0));
-
-                        eggGainNode = eggAudioCtx.createGain();
-                        eggGainNode.gain.value = 8.0;
-                        eggGainNode.connect(eggAudioCtx.destination);
-
-                        playEggLoop();
-                    } catch(err) {
-                        console.warn('Easter egg audio error:', err);
-                    }
-                }
+                // Iniciar 10 gritos simultáneos
+                startScream();
             }
 
             function deactivateEasterEgg() {
                 isEggActive = false;
 
-                // 1. Detener el grito INMEDIATAMENTE
-                stopEggLoop();
+                // 1. Detener gritos INMEDIATAMENTE
+                stopScream();
 
                 // 2. Fade-out del overlay
                 overlay.style.transition = 'opacity 0.4s ease';
@@ -1402,13 +1341,12 @@
                     overlay.style.transition = '';
                 }, 400);
 
-                // 3. Reiniciar el soundtrack desde el principio con fade-in gradual
+                // 3. Reiniciar soundtrack con fade-in gradual
                 if (gameState !== 'PLAYING' && gameState !== 'GAMEOVER') {
                     menuMusic.pause();
                     menuMusic.currentTime = 0;
                     menuMusic.volume = 0;
                     menuMusic.play().then(() => {
-                        // Subir el volumen gradualmente en 1 segundo (20 pasos de 50ms)
                         let step = 0;
                         const target = 0.3;
                         const fadeIn = setInterval(() => {
@@ -1423,10 +1361,11 @@
             // --- DESACTIVAR con 10 clicks en el overlay ---
             overlay.addEventListener('click', () => {
                 if (!isEggActive) return;
-
                 closeClicks++;
                 if (closeClicks >= 10) {
                     deactivateEasterEgg();
                 }
             });
-        })();
+        })();
+
+
