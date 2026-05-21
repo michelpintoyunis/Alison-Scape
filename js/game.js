@@ -1264,26 +1264,16 @@
             // === Web Audio API para volumen extremo (muy por encima del 100%) ===
             let eggAudioCtx   = null;
             let eggGainNode   = null;
-            let eggBuffer     = null;
-            let eggSources    = [];    // array de las 10 fuentes simultáneas
+            let eggBuffer     = null;   // AudioBuffer decodificado
+            let eggRawBuffer  = null;   // ArrayBuffer crudo (reutilizable)
+            let eggSources    = [];     // fuentes activas
 
-            // Pre-cargar el buffer del grito en segundo plano
+            // Pre-cargar los bytes crudos del grito (SIN crear AudioContext aún)
+            // El AudioContext se crea solo cuando el usuario hace click (gesto requerido por browsers)
             fetch('assets/audio/grito_terror.mp3')
                 .then(r => r.arrayBuffer())
-                .then(data => {
-                    // Crear contexto de audio privado para el easter egg
-                    const AC = window.AudioContext || window.webkitAudioContext;
-                    eggAudioCtx = new AC();
-                    return eggAudioCtx.decodeAudioData(data);
-                })
-                .then(buf => {
-                    eggBuffer = buf;
-                    // GainNode amplificado al máximo: 8.0 = ~800% de volumen normal
-                    eggGainNode = eggAudioCtx.createGain();
-                    eggGainNode.gain.value = 8.0;
-                    eggGainNode.connect(eggAudioCtx.destination);
-                })
-                .catch(e => console.warn('Easter egg audio preload failed:', e));
+                .then(ab => { eggRawBuffer = ab; })
+                .catch(e => console.warn('Easter egg preload failed:', e));
 
             // 10 gritos con loop nativo (reinicio INSTANTÁNEO, sin gaps, sin setTimeout)
             function playEggLoop() {
@@ -1356,7 +1346,9 @@
             if (splashTitleEl) splashTitleEl.addEventListener('click', (e) => onTitleClick(e, splashTitleEl));
 
 
-            function activateEasterEgg() {
+            // activateEasterEgg es async: crea AudioContext DENTRO del click (gesto del usuario)
+            // → el browser lo arranca en 'running', nunca en 'suspended'
+            async function activateEasterEgg() {
                 isEggActive = true;
                 closeClicks = 0;
 
@@ -1368,19 +1360,31 @@
                 menuMusic.pause();
                 menuMusic.currentTime = 0;
 
-                // --- Iniciar grito con Web Audio API a volumen extremo ---
-                if (eggBuffer) {
-                    // Si el contexto fue cerrado por stopEggLoop(), recrearlo desde el buffer ya decodificado
-                    if (!eggAudioCtx || eggAudioCtx.state === 'closed') {
+                // --- Crear contexto FRESCO en cada activación (dentro del gesto del usuario) ---
+                if (eggRawBuffer) {
+                    try {
+                        // Cerrar contexto anterior si existe
+                        if (eggAudioCtx) {
+                            eggAudioCtx.close().catch(() => {});
+                            eggAudioCtx = null;
+                            eggGainNode = null;
+                        }
+
                         const AC = window.AudioContext || window.webkitAudioContext;
-                        eggAudioCtx = new AC();
+                        eggAudioCtx = new AC(); // arranca 'running' porque está en un click
+
+                        // slice() para no consumir el ArrayBuffer original
+                        eggBuffer = await eggAudioCtx.decodeAudioData(eggRawBuffer.slice(0));
+
                         eggGainNode = eggAudioCtx.createGain();
                         eggGainNode.gain.value = 8.0;
                         eggGainNode.connect(eggAudioCtx.destination);
+
+                        playEggLoop();
+                    } catch(err) {
+                        console.warn('Easter egg audio error:', err);
                     }
-                    playEggLoop();
                 }
-                // (Si el buffer aún no cargó, simplemente no se reproduce — raro pero seguro)
             }
 
             function deactivateEasterEgg() {
