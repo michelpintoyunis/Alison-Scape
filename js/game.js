@@ -1266,7 +1266,6 @@
             let eggGainNode   = null;
             let eggBuffer     = null;
             let eggSources    = [];    // array de las 10 fuentes simultáneas
-            let eggLoopTimer  = null;  // timer del re-inicio anticipado
 
             // Pre-cargar el buffer del grito en segundo plano
             fetch('assets/audio/grito_terror.mp3')
@@ -1286,47 +1285,40 @@
                 })
                 .catch(e => console.warn('Easter egg audio preload failed:', e));
 
-            // Reproduce 10 fuentes simultáneas recortando 1s del inicio y 1s del final
-            // → saturación total y clipping garantizado
+            // 10 gritos con loop nativo (reinicio INSTANTÁNEO, sin gaps, sin setTimeout)
             function playEggLoop() {
                 if (!eggAudioCtx || !eggBuffer || !eggGainNode) return;
 
-                const TRIM_START   = 1.0;  // segundos a recortar del inicio
-                const TRIM_END     = 1.0;  // segundos a recortar del final
-                const SOURCES      = 10;   // gritos simultáneos
-                const OVERLAP      = 0.4;  // segundos de anticipación para el próximo ciclo
+                const TRIM_START = 1.0;  // recortar primer segundo
+                const TRIM_END   = 1.0;  // recortar último segundo
+                const SOURCES    = 10;   // gritos simultáneos
+                const loopEnd    = Math.max(TRIM_START + 0.1, eggBuffer.duration - TRIM_END);
 
-                const rawDuration    = eggBuffer.duration;
-                const trimmedDuration = Math.max(0.1, rawDuration - TRIM_START - TRIM_END);
-
-                // Detener todas las fuentes activas del ciclo anterior
-                eggSources.forEach(s => { try { s.stop(); s.disconnect(); } catch(e) {} });
+                // Limpiar fuentes previas
+                eggSources.forEach(s => { try { s.stop(0); s.disconnect(); } catch(e) {} });
                 eggSources = [];
 
-                // Lanzar SOURCES gritos al mismo tiempo
                 for (let i = 0; i < SOURCES; i++) {
                     const src = eggAudioCtx.createBufferSource();
-                    src.buffer = eggBuffer;
+                    src.buffer    = eggBuffer;
+                    src.loop      = true;        // loop nativo → reinicio INSTANTÁNEO
+                    src.loopStart = TRIM_START;  // empieza en el segundo 1
+                    src.loopEnd   = loopEnd;     // termina 1s antes del final
                     src.connect(eggGainNode);
-                    // start(when, offset, duration) — recorta primer y último segundo
-                    src.start(0, TRIM_START, trimmedDuration);
+                    src.start(0, TRIM_START);    // comenzar ya desde el corte
                     eggSources.push(src);
                 }
-
-                // Programar el siguiente ciclo 0.4s antes de que termine
-                const delay = Math.max(0, (trimmedDuration - OVERLAP) * 1000);
-                clearTimeout(eggLoopTimer);
-                eggLoopTimer = setTimeout(() => {
-                    if (isEggActive) playEggLoop();
-                }, delay);
             }
 
+            // Cierra el contexto completamente → silencio INMEDIATO y total
             function stopEggLoop() {
-                clearTimeout(eggLoopTimer);
-                eggSources.forEach(s => { try { s.stop(); s.disconnect(); } catch(e) {} });
+                eggSources.forEach(s => { try { s.stop(0); s.disconnect(); } catch(e) {} });
                 eggSources = [];
-                if (eggAudioCtx && eggAudioCtx.state === 'running') {
-                    eggAudioCtx.suspend();
+                if (eggAudioCtx) {
+                    eggAudioCtx.close().catch(() => {});
+                    eggAudioCtx = null;
+                    eggGainNode = null;
+                    // eggBuffer queda intacto para reutilizar en la próxima activación
                 }
             }
 
@@ -1367,21 +1359,18 @@
                 menuMusic.currentTime = 0;
 
                 // --- Iniciar grito con Web Audio API a volumen extremo ---
-                if (eggAudioCtx && eggBuffer) {
-                    // Reanudar contexto si estaba suspendido
-                    if (eggAudioCtx.state === 'suspended') {
-                        eggAudioCtx.resume().then(() => playEggLoop());
-                    } else {
-                        playEggLoop();
+                if (eggBuffer) {
+                    // Si el contexto fue cerrado por stopEggLoop(), recrearlo desde el buffer ya decodificado
+                    if (!eggAudioCtx || eggAudioCtx.state === 'closed') {
+                        const AC = window.AudioContext || window.webkitAudioContext;
+                        eggAudioCtx = new AC();
+                        eggGainNode = eggAudioCtx.createGain();
+                        eggGainNode.gain.value = 8.0;
+                        eggGainNode.connect(eggAudioCtx.destination);
                     }
-                } else {
-                    // Fallback: HTML Audio si el buffer no cargó aún
-                    const fallback = new Audio('assets/audio/grito_terror.mp3');
-                    fallback.loop   = true;
-                    fallback.volume = 1.0;
-                    fallback.play().catch(e => console.warn('Fallback scream error:', e));
-                    eggSources.push(fallback); // guardar referencia para detenerlo
+                    playEggLoop();
                 }
+                // (Si el buffer aún no cargó, simplemente no se reproduce — raro pero seguro)
             }
 
             function deactivateEasterEgg() {
