@@ -1255,7 +1255,6 @@
         (function initEasterEgg() {
             const titleEl = document.getElementById('menu-title-trigger');
             const overlay = document.getElementById('easter-egg-overlay');
-            const hintEl  = document.getElementById('easter-egg-hint');
 
             let titleClicks   = 0;
             let closeClicks   = 0;
@@ -1357,7 +1356,6 @@
 
                 // Mostrar overlay
                 overlay.style.display = 'block';
-                if (hintEl) hintEl.textContent = 'CLICK 10 VECES PARA ESCAPAR...';
 
                 // --- Silenciar COMPLETAMENTE la música del menú ---
                 menuMusic.volume = 0;
@@ -1409,10 +1407,6 @@
                 if (!isEggActive) return;
 
                 closeClicks++;
-                const remaining = 10 - closeClicks;
-                if (hintEl && remaining > 0) {
-                    hintEl.textContent = `CLICK ${remaining} MÁS PARA ESCAPAR...`;
-                }
                 if (closeClicks >= 10) {
                     deactivateEasterEgg();
                 }

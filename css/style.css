@@ -722,27 +722,6 @@ body, html {
             100% { transform: translate(0px, 0px)   rotate(0deg); }
         }
 
-        #easter-egg-hint {
-            position: absolute;
-            bottom: 30px;
-            left: 50%;
-            transform: translateX(-50%);
-            font-family: 'Black Ops One', cursive;
-            font-size: clamp(1.2rem, 3vw, 2rem);
-            color: #fff;
-            text-shadow: 0 0 20px #ff0000, 0 0 40px #ff0000, 2px 2px 6px #000;
-            letter-spacing: 4px;
-            text-align: center;
-            white-space: nowrap;
-            animation: easterHintPulse 0.7s infinite alternate;
-            pointer-events: none;
-        }
-
-        @keyframes easterHintPulse {
-            0%   { opacity: 1;   text-shadow: 0 0 20px #ff0000, 0 0 50px #ff0000; }
-            100% { opacity: 0.3; text-shadow: 0 0 5px  #ff3333; }
-        }
-
         /* Title glow effect when building up clicks */
         #menu-title-trigger {
             cursor: pointer;
