@@ -1253,30 +1253,89 @@
         // 🥚 EASTER EGG — TITULO X10 CLICKS
         // ==========================================
         (function initEasterEgg() {
-            const titleEl    = document.getElementById('menu-title-trigger');
-            const overlay    = document.getElementById('easter-egg-overlay');
-            const hintEl     = document.getElementById('easter-egg-hint');
-            const screamAudio = new Audio('assets/audio/grito_terror.mp3');
-            screamAudio.loop   = true;
-            screamAudio.volume = 1.0;
+            const titleEl = document.getElementById('menu-title-trigger');
+            const overlay = document.getElementById('easter-egg-overlay');
+            const hintEl  = document.getElementById('easter-egg-hint');
 
-            let titleClicks  = 0;
-            let closeClicks  = 0;
+            let titleClicks   = 0;
+            let closeClicks   = 0;
             let chargeTimeout = null;
-            let isEggActive  = false;
+            let isEggActive   = false;
+
+            // === Web Audio API para volumen extremo (muy por encima del 100%) ===
+            let eggAudioCtx   = null;
+            let eggGainNode   = null;
+            let eggBuffer     = null;
+            let eggSource     = null;       // fuente activa actual
+            let eggLoopTimer  = null;       // timer del re-inicio anticipado
+
+            // Pre-cargar el buffer del grito en segundo plano
+            fetch('assets/audio/grito_terror.mp3')
+                .then(r => r.arrayBuffer())
+                .then(data => {
+                    // Crear contexto de audio privado para el easter egg
+                    const AC = window.AudioContext || window.webkitAudioContext;
+                    eggAudioCtx = new AC();
+                    return eggAudioCtx.decodeAudioData(data);
+                })
+                .then(buf => {
+                    eggBuffer = buf;
+                    // GainNode amplificado al máximo: 8.0 = ~800% de volumen normal
+                    eggGainNode = eggAudioCtx.createGain();
+                    eggGainNode.gain.value = 8.0;
+                    eggGainNode.connect(eggAudioCtx.destination);
+                })
+                .catch(e => console.warn('Easter egg audio preload failed:', e));
+
+            // Reproduce el buffer y programa el próximo inicio 0.5s antes de que termine
+            function playEggLoop() {
+                if (!eggAudioCtx || !eggBuffer || !eggGainNode) return;
+
+                // Detener fuente anterior si existe
+                if (eggSource) {
+                    try { eggSource.stop(); } catch(e) {}
+                    eggSource.disconnect();
+                }
+
+                const src = eggAudioCtx.createBufferSource();
+                src.buffer = eggBuffer;
+                src.connect(eggGainNode);
+                src.start(0);
+                eggSource = src;
+
+                // Programar el siguiente inicio 0.5s antes de que termine el actual
+                const duration = eggBuffer.duration;
+                const overlap  = 0.5; // segundos de anticipación
+                const delay    = Math.max(0, (duration - overlap) * 1000);
+
+                clearTimeout(eggLoopTimer);
+                eggLoopTimer = setTimeout(() => {
+                    if (isEggActive) playEggLoop();
+                }, delay);
+            }
+
+            function stopEggLoop() {
+                clearTimeout(eggLoopTimer);
+                if (eggSource) {
+                    try { eggSource.stop(); } catch(e) {}
+                    eggSource.disconnect();
+                    eggSource = null;
+                }
+                // Suspender el contexto para liberar recursos
+                if (eggAudioCtx && eggAudioCtx.state === 'running') {
+                    eggAudioCtx.suspend();
+                }
+            }
 
             // --- ACTIVAR con 10 clicks en el título ---
             if (titleEl) {
                 titleEl.addEventListener('click', (e) => {
-                    // Prevenir que el click no propague al body listener de música
-                    e.stopPropagation();
-
+                    e.stopPropagation(); // No propagar al body listener de música
                     if (isEggActive) return;
 
                     titleClicks++;
                     titleEl.classList.add('egg-charging');
 
-                    // Reset del contador si pasan 3 segundos entre clicks
                     clearTimeout(chargeTimeout);
                     chargeTimeout = setTimeout(() => {
                         titleClicks = 0;
@@ -1293,29 +1352,40 @@
             }
 
             function activateEasterEgg() {
-                isEggActive  = true;
-                closeClicks  = 0;
+                isEggActive = true;
+                closeClicks = 0;
 
                 // Mostrar overlay
                 overlay.style.display = 'block';
-
-                // Actualizar hint
                 if (hintEl) hintEl.textContent = 'CLICK 10 VECES PARA ESCAPAR...';
 
-                // Pausar música del menú si suena
-                if (!menuMusic.paused) {
-                    menuMusic.pause();
-                }
+                // --- Silenciar COMPLETAMENTE la música del menú ---
+                menuMusic.volume = 0;
+                menuMusic.pause();
+                menuMusic.currentTime = 0;
 
-                // Reproducir grito a todo volumen en loop
-                screamAudio.currentTime = 0;
-                screamAudio.play().catch(e => console.warn('Easter egg audio blocked:', e));
+                // --- Iniciar grito con Web Audio API a volumen extremo ---
+                if (eggAudioCtx && eggBuffer) {
+                    // Reanudar contexto si estaba suspendido
+                    if (eggAudioCtx.state === 'suspended') {
+                        eggAudioCtx.resume().then(() => playEggLoop());
+                    } else {
+                        playEggLoop();
+                    }
+                } else {
+                    // Fallback: HTML Audio si el buffer no cargó aún
+                    const fallback = new Audio('assets/audio/grito_terror.mp3');
+                    fallback.loop   = true;
+                    fallback.volume = 1.0;
+                    fallback.play().catch(e => console.warn('Fallback scream error:', e));
+                    eggSource = fallback; // guardar referencia para detenerlo
+                }
             }
 
             function deactivateEasterEgg() {
                 isEggActive = false;
 
-                // Animar desaparición rápida
+                // Fade-out del overlay
                 overlay.style.transition = 'opacity 0.4s ease';
                 overlay.style.opacity = '0';
                 setTimeout(() => {
@@ -1324,13 +1394,13 @@
                     overlay.style.transition = '';
                 }, 400);
 
-                // Detener grito
-                screamAudio.pause();
-                screamAudio.currentTime = 0;
+                // Detener grito completamente
+                stopEggLoop();
 
-                // Reanudar música del menú si el juego no ha empezado
+                // Restaurar música del menú si el juego no ha iniciado
                 if (gameState !== 'PLAYING' && gameState !== 'GAMEOVER') {
-                    menuMusic.play().catch(e => console.warn('menuMusic resume blocked:', e));
+                    menuMusic.volume = 0.3;
+                    menuMusic.play().catch(e => console.warn('menuMusic resume error:', e));
                 }
             }
 
@@ -1339,13 +1409,10 @@
                 if (!isEggActive) return;
 
                 closeClicks++;
-
-                // Actualizar hint con conteo regresivo
                 const remaining = 10 - closeClicks;
                 if (hintEl && remaining > 0) {
                     hintEl.textContent = `CLICK ${remaining} MÁS PARA ESCAPAR...`;
                 }
-
                 if (closeClicks >= 10) {
                     deactivateEasterEgg();
                 }
