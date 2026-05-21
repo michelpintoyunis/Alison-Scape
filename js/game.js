@@ -1248,3 +1248,106 @@
         });
 
         requestAnimationFrame(update);
+
+        // ==========================================
+        // 🥚 EASTER EGG — TITULO X10 CLICKS
+        // ==========================================
+        (function initEasterEgg() {
+            const titleEl    = document.getElementById('menu-title-trigger');
+            const overlay    = document.getElementById('easter-egg-overlay');
+            const hintEl     = document.getElementById('easter-egg-hint');
+            const screamAudio = new Audio('assets/audio/grito_terror.mp3');
+            screamAudio.loop   = true;
+            screamAudio.volume = 1.0;
+
+            let titleClicks  = 0;
+            let closeClicks  = 0;
+            let chargeTimeout = null;
+            let isEggActive  = false;
+
+            // --- ACTIVAR con 10 clicks en el título ---
+            if (titleEl) {
+                titleEl.addEventListener('click', (e) => {
+                    // Prevenir que el click no propague al body listener de música
+                    e.stopPropagation();
+
+                    if (isEggActive) return;
+
+                    titleClicks++;
+                    titleEl.classList.add('egg-charging');
+
+                    // Reset del contador si pasan 3 segundos entre clicks
+                    clearTimeout(chargeTimeout);
+                    chargeTimeout = setTimeout(() => {
+                        titleClicks = 0;
+                        titleEl.classList.remove('egg-charging');
+                    }, 3000);
+
+                    if (titleClicks >= 10) {
+                        titleClicks = 0;
+                        clearTimeout(chargeTimeout);
+                        titleEl.classList.remove('egg-charging');
+                        activateEasterEgg();
+                    }
+                });
+            }
+
+            function activateEasterEgg() {
+                isEggActive  = true;
+                closeClicks  = 0;
+
+                // Mostrar overlay
+                overlay.style.display = 'block';
+
+                // Actualizar hint
+                if (hintEl) hintEl.textContent = 'CLICK 10 VECES PARA ESCAPAR...';
+
+                // Pausar música del menú si suena
+                if (!menuMusic.paused) {
+                    menuMusic.pause();
+                }
+
+                // Reproducir grito a todo volumen en loop
+                screamAudio.currentTime = 0;
+                screamAudio.play().catch(e => console.warn('Easter egg audio blocked:', e));
+            }
+
+            function deactivateEasterEgg() {
+                isEggActive = false;
+
+                // Animar desaparición rápida
+                overlay.style.transition = 'opacity 0.4s ease';
+                overlay.style.opacity = '0';
+                setTimeout(() => {
+                    overlay.style.display = 'none';
+                    overlay.style.opacity = '1';
+                    overlay.style.transition = '';
+                }, 400);
+
+                // Detener grito
+                screamAudio.pause();
+                screamAudio.currentTime = 0;
+
+                // Reanudar música del menú si el juego no ha empezado
+                if (gameState !== 'PLAYING' && gameState !== 'GAMEOVER') {
+                    menuMusic.play().catch(e => console.warn('menuMusic resume blocked:', e));
+                }
+            }
+
+            // --- DESACTIVAR con 10 clicks en el overlay ---
+            overlay.addEventListener('click', () => {
+                if (!isEggActive) return;
+
+                closeClicks++;
+
+                // Actualizar hint con conteo regresivo
+                const remaining = 10 - closeClicks;
+                if (hintEl && remaining > 0) {
+                    hintEl.textContent = `CLICK ${remaining} MÁS PARA ESCAPAR...`;
+                }
+
+                if (closeClicks >= 10) {
+                    deactivateEasterEgg();
+                }
+            });
+        })();
