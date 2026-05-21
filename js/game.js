@@ -1265,8 +1265,8 @@
             let eggAudioCtx   = null;
             let eggGainNode   = null;
             let eggBuffer     = null;
-            let eggSource     = null;       // fuente activa actual
-            let eggLoopTimer  = null;       // timer del re-inicio anticipado
+            let eggSources    = [];    // array de las 10 fuentes simultáneas
+            let eggLoopTimer  = null;  // timer del re-inicio anticipado
 
             // Pre-cargar el buffer del grito en segundo plano
             fetch('assets/audio/grito_terror.mp3')
@@ -1286,27 +1286,35 @@
                 })
                 .catch(e => console.warn('Easter egg audio preload failed:', e));
 
-            // Reproduce el buffer y programa el próximo inicio 0.5s antes de que termine
+            // Reproduce 10 fuentes simultáneas recortando 1s del inicio y 1s del final
+            // → saturación total y clipping garantizado
             function playEggLoop() {
                 if (!eggAudioCtx || !eggBuffer || !eggGainNode) return;
 
-                // Detener fuente anterior si existe
-                if (eggSource) {
-                    try { eggSource.stop(); } catch(e) {}
-                    eggSource.disconnect();
+                const TRIM_START   = 1.0;  // segundos a recortar del inicio
+                const TRIM_END     = 1.0;  // segundos a recortar del final
+                const SOURCES      = 10;   // gritos simultáneos
+                const OVERLAP      = 0.4;  // segundos de anticipación para el próximo ciclo
+
+                const rawDuration    = eggBuffer.duration;
+                const trimmedDuration = Math.max(0.1, rawDuration - TRIM_START - TRIM_END);
+
+                // Detener todas las fuentes activas del ciclo anterior
+                eggSources.forEach(s => { try { s.stop(); s.disconnect(); } catch(e) {} });
+                eggSources = [];
+
+                // Lanzar SOURCES gritos al mismo tiempo
+                for (let i = 0; i < SOURCES; i++) {
+                    const src = eggAudioCtx.createBufferSource();
+                    src.buffer = eggBuffer;
+                    src.connect(eggGainNode);
+                    // start(when, offset, duration) — recorta primer y último segundo
+                    src.start(0, TRIM_START, trimmedDuration);
+                    eggSources.push(src);
                 }
 
-                const src = eggAudioCtx.createBufferSource();
-                src.buffer = eggBuffer;
-                src.connect(eggGainNode);
-                src.start(0);
-                eggSource = src;
-
-                // Programar el siguiente inicio 0.5s antes de que termine el actual
-                const duration = eggBuffer.duration;
-                const overlap  = 0.5; // segundos de anticipación
-                const delay    = Math.max(0, (duration - overlap) * 1000);
-
+                // Programar el siguiente ciclo 0.4s antes de que termine
+                const delay = Math.max(0, (trimmedDuration - OVERLAP) * 1000);
                 clearTimeout(eggLoopTimer);
                 eggLoopTimer = setTimeout(() => {
                     if (isEggActive) playEggLoop();
@@ -1315,12 +1323,8 @@
 
             function stopEggLoop() {
                 clearTimeout(eggLoopTimer);
-                if (eggSource) {
-                    try { eggSource.stop(); } catch(e) {}
-                    eggSource.disconnect();
-                    eggSource = null;
-                }
-                // Suspender el contexto para liberar recursos
+                eggSources.forEach(s => { try { s.stop(); s.disconnect(); } catch(e) {} });
+                eggSources = [];
                 if (eggAudioCtx && eggAudioCtx.state === 'running') {
                     eggAudioCtx.suspend();
                 }
@@ -1376,7 +1380,7 @@
                     fallback.loop   = true;
                     fallback.volume = 1.0;
                     fallback.play().catch(e => console.warn('Fallback scream error:', e));
-                    eggSource = fallback; // guardar referencia para detenerlo
+                    eggSources.push(fallback); // guardar referencia para detenerlo
                 }
             }
 
